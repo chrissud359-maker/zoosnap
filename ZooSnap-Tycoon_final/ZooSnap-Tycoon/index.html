@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ZooSnap Tycoon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ======================= TITLE ======================= -->
+  <section id="titleScreen" class="screen active">
+    <div class="titleCard">
+      <div class="titleArt" id="titleArtWrap">
+        <img id="titleArt" alt="">
+        <div class="titleArtFallback" aria-hidden="true">🦁🐘🐒<br>🐧🦒🐍</div>
+      </div>
+      <div class="titleBody">
+        <h1 class="logo">Zoo<span>Snap</span> Tycoon</h1>
+        <p class="tagline" id="tagline"></p>
+
+        <label class="nameLabel" for="zooName">Name your zoo</label>
+        <div class="nameRow">
+          <input id="zooName" maxlength="24" autocomplete="off" spellcheck="false">
+          <button id="shuffleName" class="ghost" data-tip="shuffle" aria-label="Random name">🎲</button>
+        </div>
+
+        <div class="howto">
+          <h2>How to play</h2>
+          <ol>
+            <li><b>Goal:</b> welcome <b id="goalText">3,500</b> visitors in <b id="daysText">8</b> days.</li>
+            <li><b>Adopt animals</b> by holding an animal photo on your phone up to the webcam. Our AI model recognizes the species. Different animals have different costs, appeal and traits.</li>
+            <li><b>Upgrade enclosures:</b> click one in the 3D zoo to expand its fence (more animals of that species) or add comfort (happier animals, more visitors).</li>
+            <li><b>Watch capacity:</b> the zoo only holds so many visitors at once. Buy a <b>Bigger entrance</b> when the line at the gate gets long.</li>
+            <li><b>Pay upkeep</b> every night. Two nights in debt and the bank closes your zoo.</li>
+            <li><b>Watch for events.</b> When an animal escapes or a visitor asks to see one, show the right photo fast. Other events give you a choice.</li>
+            <li>Your ending depends on visitors, reputation and the animals you collect.</li>
+          </ol>
+        </div>
+
+        <div class="status">
+          <div id="modelStatus" class="chip wait">🧠 Loading model…</div>
+          <div id="camStatus" class="chip">📷 Camera starts when you open the zoo</div>
+        </div>
+        <div id="modelWarn" class="warn hidden"></div>
+        <div id="modelLoadBox" class="loadBox hidden">
+          <p>No model found. Choose your Teachable Machine export (.zip, or model.json + metadata.json + weights.bin):</p>
+          <input type="file" id="modelFiles" multiple accept=".zip,.json,.bin">
+        </div>
+
+        <div class="startRow">
+          <button id="startBtn" class="primary big" data-tip="start">Open the gates!</button>
+          <button id="manualBtn" class="ghost hidden" data-tip="manual">Play without a camera</button>
+        </div>
+        <p class="best" id="bestScore"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= GAME ======================= -->
+  <section id="gameScreen" class="screen">
+    <header class="hud">
+      <div class="brand"><span id="hudZoo">My Zoo</span></div>
+      <div class="stats">
+        <div class="stat" data-tip="day">
+          <span class="lbl">Day</span><span class="val"><span id="hudDay">1</span>/<span id="hudDays">8</span></span>
+          <div class="meter"><div id="dayBar"></div></div>
+        </div>
+        <div class="stat" id="moneyStat" data-tip="cash">
+          <span class="lbl">Cash</span><span class="val">$<span id="hudMoney">600</span></span>
+          <span class="sub">upkeep tonight −$<span id="hudUpkeep">0</span></span>
+        </div>
+        <div class="stat" data-tip="visitors">
+          <span class="lbl">Visitors</span><span class="val"><span id="hudVisitors">0</span> / <span id="hudGoal">3500</span></span>
+          <div class="meter"><div id="goalBar"></div></div>
+          <span class="sub" id="hudGate"></span>
+        </div>
+        <div class="stat" data-tip="rating">
+          <span class="lbl">Rating</span><span class="val stars" id="hudStars">★★★</span>
+          <span class="sub"><span id="hudVps">0</span> visitors/sec</span>
+        </div>
+      </div>
+      <div class="hudBtns">
+        <button id="pauseBtn" class="icon" data-tip="pause" aria-label="Pause">⏸️</button>
+        <button id="musicBtn" class="icon" data-tip="music" aria-label="Music">🎵</button>
+        <button id="soundBtn" class="icon" data-tip="sound" aria-label="Sound">🔊</button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <main class="park" id="park">
+        <div id="zoo" class="zooHost"></div>
+        <div class="coins" id="coins"></div>
+        <div class="viewHint" id="viewHint">🖱️ Drag to spin · scroll to zoom · click an enclosure to manage it</div>
+        <button id="resetView" class="ghost viewBtn" data-tip="resetview">⟲ Reset view</button>
+
+        <!-- enclosure panel -->
+        <div id="penPanel" class="penPanel hidden" role="dialog" aria-label="Enclosure">
+          <button id="ppClose" class="ppClose" aria-label="Close" data-tip="close">✕</button>
+          <h3 id="ppTitle"></h3>
+          <p id="ppSub" class="ppSub"></p>
+          <div id="ppAnimals" class="ppAnimals"></div>
+          <div id="ppUpgrades" class="ppUp">
+            <div class="upRow">
+              <div class="upInfo"><b>🐾 Capacity <span id="ppCap"></span></b><small>Bigger fence: more animals of this species in one enclosure.</small></div>
+              <button id="ppCapBtn" class="upBtn" data-tip="cap"></button>
+            </div>
+            <div class="upRow">
+              <div class="upInfo"><b>🌿 Comfort <span id="ppQol"></span></b><small>Pond, rocks, trees and a shelter: happier animals that draw more visitors.</small></div>
+              <button id="ppQolBtn" class="upBtn" data-tip="qol"></button>
+            </div>
+          </div>
+          <button id="ppAdopt" class="primary wide" data-tip="adopthere">📷 Snap to adopt here</button>
+          <button id="ppBuild" class="primary wide hidden" data-tip="build"></button>
+        </div>
+      </main>
+
+      <aside class="side">
+        <button id="adoptBtn" class="primary big wide" data-tip="adopt">📷 Snap to Adopt</button>
+        <div class="shop" id="shop">
+          <button class="shopItem" data-buy="expand" data-tip="shop-expand"><span class="si">🏗️</span><span class="st"><b>New enclosure</b><small id="expandInfo"></small></span><span class="sc" id="expandCost"></span></button>
+          <button class="shopItem" data-buy="gate" data-tip="shop-gate"><span class="si">🎟️</span><span class="st"><b>Bigger entrance</b><small id="gateInfo"></small></span><span class="sc" id="gateCost"></span></button>
+          <button class="shopItem" data-buy="snack" data-tip="shop-snack"><span class="si">🍿</span><span class="st"><b>Snack stand</b><small id="snackInfo"></small></span><span class="sc" id="snackCost"></span></button>
+          <button class="shopItem" data-buy="ads" data-tip="shop-ads"><span class="si">📣</span><span class="st"><b>Ad campaign</b><small id="adsInfo"></small></span><span class="sc" id="adsCost"></span></button>
+          <button class="shopItem" data-buy="treat" data-tip="shop-treat"><span class="si">🍉</span><span class="st"><b>Animal treats</b><small>+25 happiness for every animal</small></span><span class="sc" id="treatCost"></span></button>
+        </div>
+        <div class="ticker">
+          <h3>Zoo news</h3>
+          <ul id="log"></ul>
+        </div>
+      </aside>
+    </div>
+
+    <!-- scanner (camera) -->
+    <div id="scanner" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modalCard scanCard">
+        <h2 id="scanTitle">📷 Snap to Adopt</h2>
+        <p id="scanHelp" class="help"></p>
+        <div id="scanTimer" class="timer hidden"><div id="scanTimerBar"></div><span id="scanTimerText"></span></div>
+        <div class="scanBody">
+          <div class="camBox">
+            <div id="camHolder"></div>
+            <div class="lockRing"><div id="lockBar"></div></div>
+            <div id="scanStatus" class="scanStatus"></div>
+          </div>
+          <div class="bars" id="predBars"></div>
+          <div class="manualPick hidden" id="manualPick"></div>
+        </div>
+        <div id="scanFeedback" class="feedback"></div>
+        <div class="row end">
+          <button id="scanCancel" class="ghost">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- adoption result -->
+    <div id="adoptCard" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modalCard animalCard">
+        <div class="animalPic"><img id="acImg" alt=""><span id="acEmoji" class="bigEmoji"></span></div>
+        <div class="animalInfo">
+          <p class="recog">The AI recognized: <b id="acConf"></b></p>
+          <h2 id="acName"></h2>
+          <p class="role" id="acRole"></p>
+          <div class="kv">
+            <div><span>Cost</span><b id="acCost"></b></div>
+            <div><span>Appeal</span><b id="acAppeal"></b></div>
+            <div><span>Upkeep/night</span><b id="acUpkeep"></b></div>
+            <div><span>You own</span><b id="acOwned"></b></div>
+          </div>
+          <p class="trait" id="acTrait"></p>
+          <p class="destPen" id="acPen"></p>
+          <p class="why" id="acWhy"></p>
+          <div class="row">
+            <button id="acAdopt" class="primary" data-tip="acadopt">Adopt</button>
+            <button id="acRescan" class="ghost" data-tip="rescan">Scan another</button>
+            <button id="acClose" class="ghost">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- choice event -->
+    <div id="choiceCard" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modalCard eventCard">
+        <h2 id="chTitle"></h2>
+        <p id="chText"></p>
+        <div class="choices">
+          <button id="chA" class="choice" data-tip="choiceA"></button>
+          <button id="chB" class="choice" data-tip="choiceB"></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- pause -->
+    <div id="pauseOverlay" class="modal hidden">
+      <div class="modalCard small">
+        <h2>⏸ Paused</h2>
+        <div class="row center">
+          <button id="resumeBtn" class="primary">Resume</button>
+          <button id="quitBtn" class="ghost">Restart</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toasts" class="toasts" aria-live="polite"></div>
+  </section>
+
+  <!-- ======================= END ======================= -->
+  <section id="endScreen" class="screen">
+    <div class="endCard">
+      <div class="endArt"><img id="endImg" alt=""><span id="endEmoji" class="bigEmoji"></span></div>
+      <h1 id="endTitle"></h1>
+      <p id="endText" class="endText"></p>
+      <div class="endStats" id="endStats"></div>
+      <p class="score">Zoo score: <b id="endScore">0</b> <span id="endBest"></span></p>
+      <div class="row center">
+        <button id="againBtn" class="primary big" data-tip="again">↻ Play again</button>
+        <button id="menuBtn" class="ghost" data-tip="menu">Main menu</button>
+      </div>
+    </div>
+  </section>
+
+  <footer class="credits">
+    ZooSnap Tycoon · AI &amp; Society · Image model trained with Teachable Machine · Text generated with Claude · Art &amp; audio: see README
+  </footer>
+</div>
+
+<div id="tip" class="tip hidden" role="tooltip"></div>
+
+<audio id="music" loop preload="auto"></audio>
+
+<script src="lib/tf.min.js"></script>
+<script src="lib/teachablemachine-image.min.js"></script>
+<script src="lib/jszip.min.js"></script>
+<script src="lib/three.min.js"></script>
+<script src="config.js"></script>
+<script src="text.js"></script>
+<script src="sim.js"></script>
+<script src="modelpack.js"></script>
+<script src="zoo3d.js"></script>
+<script src="model/model-pack.js" onerror="window.ZOO_MODEL_PACK_MISSING = true"></script>
+<script src="game.js"></script>
+</body>
+</html>
