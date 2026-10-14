@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Model Packer</title>
+<style>
+  :root { --ink: #1f2a22; --leaf: #2f7d4f; --card: #fffdf6; --line: #e4dccb; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif; color: var(--ink); background: #e3f2e6; }
+  main { max-width: 680px; margin: 32px auto; padding: 0 16px; }
+  .card { background: var(--card); border-radius: 18px; padding: 22px 24px; box-shadow: 0 6px 18px rgba(0,0,0,.1); }
+  h1 { margin-top: 0; color: #1e5636; }
+  ol { line-height: 1.6; padding-left: 20px; }
+  code { background: #eef3ee; padding: 1px 6px; border-radius: 4px; }
+  .drop { border: 3px dashed #9fc5a8; border-radius: 14px; padding: 26px; text-align: center; margin: 16px 0; background: #f4faf4; }
+  .drop.over { background: #dff0e2; border-color: var(--leaf); }
+  button { font: inherit; background: var(--leaf); color: #fff; border: 0; border-radius: 10px; padding: 10px 18px; cursor: pointer; font-weight: 600; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  #msg { font-weight: 600; min-height: 1.4em; }
+  .ok { color: #1e5636; } .bad { color: #b42318; }
+  a { color: var(--leaf); }
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <h1>🧠 Model Packer</h1>
+    <p>This turns your Teachable Machine model into one file, <code>model-pack.js</code>, so the game runs by double-clicking <code>index.html</code> with no internet or web server.</p>
+    <ol>
+      <li>In Teachable Machine: <b>Export Model</b> → <b>Tensorflow.js</b> tab → <b>Download</b> → <b>Download my model</b>. You get a <code>.zip</code>.</li>
+      <li>Drop that .zip below (or the three files inside it: <code>model.json</code>, <code>metadata.json</code>, <code>weights.bin</code>).</li>
+      <li>Save the downloaded <code>model-pack.js</code> into this game's <code>model</code> folder (replace the old one).</li>
+    </ol>
+    <div class="drop" id="drop">
+      <p>Drop the .zip here, or</p>
+      <input type="file" id="files" multiple accept=".zip,.json,.bin">
+    </div>
+    <p id="msg"></p>
+    <button id="save" disabled>Download model-pack.js</button>
+    <p><a href="index.html">← Back to the game</a></p>
+  </div>
+</main>
+<script src="lib/tf.min.js"></script>
+<script src="lib/teachablemachine-image.min.js"></script>
+<script src="lib/jszip.min.js"></script>
+<script src="modelpack.js"></script>
+<script>
+  (function () {
+    let script = null;
+    const msg = document.getElementById("msg"), save = document.getElementById("save");
+    function say(t, cls) { msg.textContent = t; msg.className = cls || ""; }
+    async function handle(files) {
+      save.disabled = true; script = null;
+      say("Reading files…");
+      try {
+        const pack = await ZooModelPack.filesToPack(files);
+        say("Checking that the model loads…");
+        const m = await ZooModelPack.loadPack(pack);
+        const kb = Math.round(pack.weights.reduce((t, w) => t + w.base64.length * 0.75, 0) / 1024);
+        script = ZooModelPack.packToScript(pack);
+        say("✓ Model works! Classes: " + m.getClassLabels().join(", ") + " (" + kb + " KB). Click Download.", "ok");
+        save.disabled = false;
+      } catch (e) {
+        console.warn(e);
+        say("✗ " + ((e && e.message) || e), "bad");
+      }
+    }
+    document.getElementById("files").addEventListener("change", (e) => handle(e.target.files));
+    const drop = document.getElementById("drop");
+    ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+    ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+    drop.addEventListener("drop", (e) => handle(e.dataTransfer.files));
+    save.addEventListener("click", () => {
+      if (!script) return;
+      const url = URL.createObjectURL(new Blob([script], { type: "text/javascript" }));
+      const a = document.createElement("a");
+      a.href = url; a.download = "model-pack.js";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      say("✓ Saved. Move model-pack.js into the game's model folder, then open index.html.", "ok");
+    });
+  })();
+</script>
+</body>
+</html>
